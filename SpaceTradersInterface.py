@@ -18,7 +18,6 @@ class Game:
             self._agents.append(agent)
         self._current_agent = None
         
-        
     def get_agents(self):
         return self._agents
     
@@ -79,13 +78,20 @@ class Game:
                 
     
     def list_ships(self):
-        pass
+        return self._ships
     
     def request_ships(self,response=None):
         if response == None:
             token = self._current_agent.get_token()
             headers = {"Authorization":f"Bearer {token}"}
-            new_request = Request("GET","/v2/my/contracts",headers=headers,after=self.request_contracts)
+            new_request = Request("GET","/v2/my/ships",headers=headers,after=self.request_ships)
+            self._request_queue.append(new_request)
+        else:
+            self._ships = []
+            ships_list = response["data"]
+            for ship_dict in ships_list:
+                new_ship = Ship(ship_dict)
+                self._ships.append(new_ship)
     
     def get_waypoints(self):
         pass
@@ -239,6 +245,125 @@ class Delivery:
     def get_progress(self):
         return (self._required,self._fulfilled)
     
+class Ship:
+    def __init__(self,ship_dict):
+        self._symbol = ship_dict["symbol"]
+        registration = ship_dict["registration"]
+        self._faction_symbol = registration["factionSymbol"]
+        self._role = registration["role"]
+        
+        self._navigation = self.Navigation(ship_dict["nav"])
+        self._crew = self.Crew(ship_dict["crew"])
+        self._frame = self.Frame(ship_dict["frame"])
+        self._reactor = self.Reactor(ship_dict["reactor"])
+        self._engine = self.Engine(ship_dict["engine"])
+        self._modules = []
+        for module in ship_dict["modules"]:
+            new_module = self.Module(module)
+            self._modules.append(new_module)
+        
+        self._mounts = []
+        for mount in ship_dict["mounts"]:
+            new_mount = self.Mount(mount)
+            self._mounts.append(new_mount)
+        
+        self._cargo = self.Cargo(ship_dict["cargo"])
+        
+        self._fuel = self.Fuel(ship_dict["fuel"])
+        
+        self._cooldown = self.Cooldown(ship_dict["cooldown"])
+
+
+    class Navigation:
+        def __init__(self,nav_dict):
+            self._system_symbol = nav_dict["systemSymbol"]
+            self._waypoint_symbol = nav_dict["waypointSymbol"]
+            self._route = self.Route(nav_dict["route"])
+            self._status = nav_dict["status"]
+            self._flight_mode = nav_dict["flightMode"]
+            
+        class Route:
+            def __init__(self,route_dict):
+                pass
+    
+    class Crew:
+        def __init__(self,crew_dict):
+            self._current_count = crew_dict["current"]
+            self._required_count = crew_dict["required"]
+            self._capacity = crew_dict["capacity"]
+            self._rotation = crew_dict["rotation"]
+            self._morale = crew_dict["morale"]
+            self._wages = crew_dict["wages"]
+            
+    class Frame:
+        def __init__(self,frame_dict):
+            self._symbol = frame_dict["symbol"]
+            self._name = frame_dict["name"]
+            self._condition = frame_dict["condition"]
+            self._integrity = frame_dict["integrity"]
+            self._description = frame_dict["description"]
+            self._module_slots = frame_dict["moduleSlots"]
+            self._mounting_points = frame_dict["mountingPoints"]
+            self._fuel_capacity = frame_dict["fuelCapacity"]
+            self._requirements = frame_dict["requirements"]
+            self._quality = frame_dict["quality"]
+            
+    class Reactor:
+        def __init__(self,reactor_dict):
+            self._symbol = reactor_dict["symbol"]
+            self._name = reactor_dict["name"]
+            self._condition = reactor_dict["condition"]
+            self._integrity = reactor_dict["integrity"]
+            self._description = reactor_dict["description"]
+            self._power_output = reactor_dict["powerOutput"]
+            self._requirements = reactor_dict["requirements"]
+            
+    class Engine:
+        def __init__(self,engine_dict):
+            self._symbol = engine_dict["symbol"]
+            self._name = engine_dict["name"]
+            self._condition = engine_dict["condition"]
+            self._integrity = engine_dict["integrity"]
+            self._description = engine_dict["description"]
+            self._speed = engine_dict["speed"]
+            self._requirements = engine_dict["requirements"]
+    
+    class Module:
+        def __init__(self,module_dict):
+            self._symbol = module_dict["symbol"]
+            self._name = module_dict["name"]
+            self._description = module_dict["description"]
+            self._requirements = module_dict["requirements"]
+            self._capacity = None
+            if "capacity" in module_dict:
+                self._capacity = module_dict["capacity"]
+                
+    class Mount:
+        def __init__(self,mount_dict):
+            self._symbol = mount_dict["symbol"]
+            self._name = mount_dict["name"]
+            self._description = mount_dict["description"]
+            self._requirements = mount_dict["requirements"]
+            self._strength = mount_dict["strength"]
+            
+    class Cargo:
+        def __init__(self,cargo_dict):
+            self._capacity = cargo_dict["capacity"]
+            self._units = cargo_dict["units"]
+            self._inventory = cargo_dict["inventory"]
+            
+    class Fuel:
+        def __init__(self,fuel_dict):
+            self._current = fuel_dict["current"]
+            self._capacity = fuel_dict["capacity"]
+            self._consumed = fuel_dict["consumed"]
+        
+    class Cooldown:
+        def __init__(self,cooldown_dict):
+            self._total_seconds = cooldown_dict["totalSeconds"]
+            self._remaining_seconds = cooldown_dict["remainingSeconds"]
+            
+    
 def server_to_datetime(server_time):
     normal_time = datetime.datetime.fromisoformat(server_time)
     
@@ -261,7 +386,7 @@ with open("AgentToken.txt") as token_file:
     
 my_agent = Agent(agent_token,None,None,None,None,None)
 current_game.select_agent(my_agent)
-current_game.request_contracts()
+current_game.request_ships()
 current_game.handle_requests()
-print(current_game.list_contracts())
+
     
