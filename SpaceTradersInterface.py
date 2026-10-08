@@ -15,13 +15,18 @@ class Game:
         self._connection = http.client.HTTPSConnection("api.spacetraders.io")
         self._request_queue = []
         for agent in self._database.get_agents():
-            self._agents.append(agent)
+            new_agent = Agent(agent_tuple=agent)
+            self._agents.append(new_agent)
         self._current_agent = None
         
     def get_agents(self):
+        if len(self._agents) == 0:
+            agent_list = self._database.get_agents()
+            for agent in agent_list:
+                print(agent)
         return self._agents
     
-    def create_agent(self,symbol=None,faction=None,response=None,):
+    def register_agent(self,symbol=None,faction=None,response=None,):
         if response == None:
             payload_list = ["{"]
             payload_list.append("'symbol': ")
@@ -36,9 +41,30 @@ class Game:
             self._request_queue.append(new_request)
         else:
             pass # dont need to worry about this until after server reset
+        
+    def add_agent(self,agent_token=None,response=None):
+        if agent_token:
+            headers = {"Authorization":f"Bearer {agent_token}"}
+            new_request = Request("GET","/v2/my/agent",headers=headers,after=self.add_agent)
+            self._request_queue.append(new_request)
+        if response:
+            response["data"]["token"] = agent_token
+            new_agent = Agent(response["data"])
+            command = """
+                SELECT * FROM Agents
+                WHERE Symbol = ?
+                """
+            if len(list(self._database.execute(command,new_agent.get_symbol()))) < 1:
+                command = """
+                    INSERT INTO Agents
+                    VALUES (?,?)
+                    """
+                self._agents.append(new_agent)
+                self._database.execute(command,new_agent.get_symbol(),new_agent.get_token())
     
     def select_agent(self,agent):
         self._current_agent = agent
+        
     
     def get_current_agent(self):
         return self._current_agent
@@ -97,6 +123,8 @@ class Game:
         pass
     
     def handle_requests(self):
+        if len(self._request_queue) < 1:
+            return
         current_request = self._request_queue.pop(0)
         if current_request.command == "GET":
             self._connection.request(current_request.command,current_request.link,headers=current_request.headers)
@@ -109,9 +137,10 @@ class Game:
         
         if response.status != 200:
             print("bad status: ",response.status)
+            print(response_data)
             return
         if current_request.after == None:
-            print(response)
+            print(response_data)
         else:
             response_json = json.loads(response_data) 
             current_request.after(response=response_json)
@@ -126,48 +155,100 @@ class Request:
         self.after = after
 
 class Agent:
-    def __init__(self,token,symbol,headquarters,credit,starting_faction,ship_count):
-        self._token = token
+    def __init__(self,agent_dict=None,agent_tuple=None):
+        if agent_dict:
+            self._token = agent_dict["token"]
+            self._symbol = agent_dict["symbol"]
+            self._headquarters = agent_dict["headquarters"]
+            self._credits = agent_dict["credits"]
+            self._starting_faction = agent_dict["startingFaction"]
+            self._ship_count = agent_dict["shipCount"]
+        else:
+            self._token = agent_tuple[1]
+            self._symbol = agent_tuple[0]
+            self._headquarters = None
+            self._credits = None
+            self._starting_faction = None
+            self._ship_count = None
+        
+    def __repr__(self):
+        return f"Agent-{self._symbol}"
     
     def get_token(self):
         return self._token
     
     def get_symbol(self):
-        pass
+        return self._symbol
     
     def get_headquarters(self):
-        pass
+        return self._headquarters
     
     def get_credits(self):
-        pass
+        return self._credits
+    
+    def set_credits(self,new_credits):
+        self._credits = new_credits
     
     def get_starting_faction(self):
-        pass
+        return self._starting_faction
     
     def get_ship_count(self):
-        pass
+        return self._ship_count
+    
+    def set_ship_count(self,new_ship_count):
+        self._ship_count = new_ship_count
 
 class Database:
     def __init__(self,database_name):
-        pass
+        self._database_name = database_name
+        command = """
+            CREATE TABLE IF NOT EXISTS Agents (
+               Symbol TEXT,
+               Token TEXT
+               )
+            """
+        self.execute(command)
+        
+    def execute(self,command,*args):
+        with sqlite3.connect(self._database_name) as connection:
+            cursor = connection.cursor()
+            result = cursor.execute(command,args)
+        return result
     
-    def get_agents(self,agent_id=None):
-        return []
+    def get_agents(self,agent_symbol=None):
+        if agent_symbol == None:
+            command = """
+                SELECT * FROM Agents
+                    """
+            return self.execute(command)
+            
+        command = """
+            SELECT * FROM Agents
+            WHERE Symbol = ?
+                """
+        return self.execute(command,agent_symbol)
+    
     
     def add_agent(self,agent):
-        pass
+        agent_token = agent.get_token()
+        agent_symbol = agent.get_symbol()
+        command = """
+            INSERT INTO Agents
+            VALUES (?, ?)
+                """
+        self.execute(command,agent_token,agent_symbol)
     
-    def update_agent(self,agent):
-        pass
-    
-    def get_contracts(self,filter_type):
-        pass
-    
-    def add_contract(contract):
-        pass
-    
-    def update_contract(contract):
-        pass
+#     def update_agent(self,agent):
+#         pass
+#     
+#     def get_contracts(self,filter_type):
+#         pass
+#     
+#     def add_contract(contract):
+#         pass
+#     
+#     def update_contract(contract):
+#         pass
     
 class Contract:
     def __init__(self,contract_id,faction,contract_type,deadline,pay_on_accept,pay_on_fulfill,accepted,fulfilled,accept_deadline):
@@ -386,9 +467,10 @@ if __name__ == "__main__":
     with open("AgentToken.txt") as token_file:
         agent_token = token_file.read().strip()
         
-    my_agent = Agent(agent_token,None,None,None,None,None)
-    current_game.select_agent(my_agent)
-    current_game.request_ships()
+
+    current_game.add_agent(agent_token)
     current_game.handle_requests()
+    print(current_game.get_agents())
+    
 
     
