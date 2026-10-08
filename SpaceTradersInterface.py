@@ -370,23 +370,25 @@ def server_to_datetime(server_time):
     return normal_time
     
     
-with open("AccountToken.txt") as account_file:
-    account_token = account_file.read().strip()
-    
-current_game = Game(account_token,DATABASE_NAME)
+
     
 
     
     
     
 ## test centre
+if __name__ == "__main__":
+    with open("AccountToken.txt") as account_file:
+        account_token = account_file.read().strip()
+        
+    current_game = Game(account_token,DATABASE_NAME)
 
-with open("AgentToken.txt") as token_file:
-    agent_token = token_file.read().strip()
-    
-my_agent = Agent(agent_token,None,None,None,None,None)
-current_game.select_agent(my_agent)
-current_game.request_ships()
-current_game.handle_requests()
+    with open("AgentToken.txt") as token_file:
+        agent_token = token_file.read().strip()
+        
+    my_agent = Agent(agent_token,None,None,None,None,None)
+    current_game.select_agent(my_agent)
+    current_game.request_ships()
+    current_game.handle_requests()
 
     
