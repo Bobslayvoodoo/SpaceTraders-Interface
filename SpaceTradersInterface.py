@@ -11,11 +11,10 @@ class Game:
         self._agents = []
         self._account_token = account_token
         self._contracts = []
-        self._ships = []
         self._connection = http.client.HTTPSConnection("api.spacetraders.io")
         self._request_queue = []
         for agent in self._database.get_agents():
-            new_agent = Agent(agent_tuple=agent)
+            new_agent = Agent(self,agent_tuple=agent)
             self._agents.append(new_agent)
         self._current_agent = None
         
@@ -28,19 +27,30 @@ class Game:
     
     def register_agent(self,symbol=None,faction=None,response=None,):
         if response == None:
-            payload_list = ["{"]
-            payload_list.append("'symbol': ")
-            payload_list.append(f"'{symbol}'")
-            payload_list.append(",\n 'faction': ")
-            payload_list.append(f"'{faction}'")
-            payload_list.append("}")
-            payload = "".join(payload_list)
+            payload_dict = {}
+            payload_dict["symbol"] = symbol
+            payload_dict["faction"] = faction
+            payload = json.dumps(payload_dict)
             headers = {"Content-Type": "application/json",
                        "Authorization": f"Bearer {self._account_token}"}
-            new_request = Request("POST","/v2/register",payload,headers,self.create_agent)
+            new_request = Request("POST","/v2/register",payload,headers,self.register_agent)
             self._request_queue.append(new_request)
         else:
-            pass # dont need to worry about this until after server reset
+            data = response["data"]
+            new_token = data["token"]
+            fake_response = {}
+            fake_response["data"] = data["agent"]
+            fake_response["data"]["token"] = new_token
+            new_agent = self.add_agent(response=fake_response)
+            
+            fake_response = {}
+            fake_response["data"] = data["ships"]
+            new_agent.request_ships(fake_response)
+            
+            fake_response = {}
+            fake_response["data"] = [data["contract"]]
+            new_agent.request_contracts(fake_response)
+            
         
     def add_agent(self,agent_token=None,response=None):
         if agent_token:
@@ -49,7 +59,7 @@ class Game:
             self._request_queue.append(new_request)
         if response:
             response["data"]["token"] = agent_token
-            new_agent = Agent(response["data"])
+            new_agent = Agent(self,response["data"])
             command = """
                 SELECT * FROM Agents
                 WHERE Symbol = ?
@@ -61,6 +71,8 @@ class Game:
                     """
                 self._agents.append(new_agent)
                 self._database.execute(command,new_agent.get_symbol(),new_agent.get_token())
+                self.select_agent(new_agent)
+            return new_agent
     
     def select_agent(self,agent):
         self._current_agent = agent
@@ -68,59 +80,14 @@ class Game:
     
     def get_current_agent(self):
         return self._current_agent
-    
-    def list_contracts(self,filter_type=None):
-        return self._contracts
-            
-    def request_contracts(self,response=None):
-        if self._current_agent == None:
-            print("Can't request contracts before selecting an agent")
-            return
-        if response == None:
-            token = self._current_agent.get_token()
-            headers = {"Authorization":f"Bearer {token}"}
-            new_request = Request("GET","/v2/my/contracts",headers=headers,after=self.request_contracts)
-            self._request_queue.append(new_request)
-        else:
-            data = response["data"]
-            self._contracts = []
-            for contract_data in data:
-                contract_id = contract_data["id"]
-                faction = contract_data["factionSymbol"]
-                contract_type = contract_data["type"]
-                terms = contract_data["terms"]
-                deadline = server_to_datetime(terms["deadline"])
-                payment = terms["payment"]
-                pay_on_accept = payment["onAccepted"]
-                pay_on_fulfill = payment["onFulfilled"]
-                accepted = contract_data["accepted"]
-                fulfilled = contract_data["fulfilled"]
-                accept_deadline = contract_data["deadlineToAccept"]
-                match contract_type:
-                    case "PROCUREMENT":
-                        deliveries = terms["deliver"]
-                        new_contract = ProcurementContract(contract_id,faction,contract_type,deadline,pay_on_accept,pay_on_fulfill,accepted,fulfilled,accept_deadline,deliveries)
-                self._contracts.append(new_contract)
-                
-    
-    def list_ships(self):
-        return self._ships
-    
-    def request_ships(self,response=None):
-        if response == None:
-            token = self._current_agent.get_token()
-            headers = {"Authorization":f"Bearer {token}"}
-            new_request = Request("GET","/v2/my/ships",headers=headers,after=self.request_ships)
-            self._request_queue.append(new_request)
-        else:
-            self._ships = []
-            ships_list = response["data"]
-            for ship_dict in ships_list:
-                new_ship = Ship(ship_dict)
-                self._ships.append(new_ship)
+
     
     def get_waypoints(self):
         pass
+    
+    def add_request(self,new_request):
+        if isinstance(new_request,Request):
+            self._request_queue.append(new_request)
     
     def handle_requests(self):
         if len(self._request_queue) < 1:
@@ -129,13 +96,13 @@ class Game:
         if current_request.command == "GET":
             self._connection.request(current_request.command,current_request.link,headers=current_request.headers)
         else:
-            self._connection.request(current_request.command,current_request.link,payload=current_request.payload,headers=current_request.headers)
+            self._connection.request(current_request.command,current_request.link,current_request.payload,current_request.headers)
             
         response = self._connection.getresponse()
         response_headers = response.getheaders()
         response_data = response.read()
         
-        if response.status != 200:
+        if response.status < 200 or response.status >= 300:
             print("bad status: ",response.status)
             print(response_data)
             return
@@ -155,7 +122,8 @@ class Request:
         self.after = after
 
 class Agent:
-    def __init__(self,agent_dict=None,agent_tuple=None):
+    def __init__(self,game,agent_dict=None,agent_tuple=None):
+        self._game = game
         if agent_dict:
             self._token = agent_dict["token"]
             self._symbol = agent_dict["symbol"]
@@ -193,10 +161,54 @@ class Agent:
         return self._starting_faction
     
     def get_ship_count(self):
-        return self._ship_count
+        return len(self._ships)
     
-    def set_ship_count(self,new_ship_count):
-        self._ship_count = new_ship_count
+        
+    def list_ships(self):
+        return self._ships
+    
+    def request_ships(self,response=None):
+        if response == None:
+            token = self._current_agent.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            new_request = Request("GET","/v2/my/ships",headers=headers,after=self.request_ships)
+            self._game.add_request(new_request)
+        else:
+            self._ships = []
+            ships_list = response["data"]
+            for ship_dict in ships_list:
+                new_ship = Ship(ship_dict)
+                self._ships.append(new_ship)
+                
+    def list_contracts(self,filter_type=None):
+        return self._contracts
+            
+    def request_contracts(self,response=None):
+        if response == None:
+            token = self.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            new_request = Request("GET","/v2/my/contracts",headers=headers,after=self.request_contracts)
+            self._game.add_request(new_request)
+        else:
+            data = response["data"]
+            self._contracts = []
+            for contract_data in data:
+                contract_id = contract_data["id"]
+                faction = contract_data["factionSymbol"]
+                contract_type = contract_data["type"]
+                terms = contract_data["terms"]
+                deadline = server_to_datetime(terms["deadline"])
+                payment = terms["payment"]
+                pay_on_accept = payment["onAccepted"]
+                pay_on_fulfill = payment["onFulfilled"]
+                accepted = contract_data["accepted"]
+                fulfilled = contract_data["fulfilled"]
+                accept_deadline = contract_data["deadlineToAccept"]
+                match contract_type:
+                    case "PROCUREMENT":
+                        deliveries = terms["deliver"]
+                        new_contract = ProcurementContract(contract_id,faction,contract_type,deadline,pay_on_accept,pay_on_fulfill,accepted,fulfilled,accept_deadline,deliveries)
+                self._contracts.append(new_contract)
 
 class Database:
     def __init__(self,database_name):
@@ -464,13 +476,8 @@ if __name__ == "__main__":
         
     current_game = Game(account_token,DATABASE_NAME)
 
-    with open("AgentToken.txt") as token_file:
-        agent_token = token_file.read().strip()
-        
 
-    current_game.add_agent(agent_token)
-    current_game.handle_requests()
-    print(current_game.get_agents())
+    
     
 
     
