@@ -17,6 +17,14 @@ class Game:
             new_agent = Agent(self,agent_tuple=agent)
             self._agents.append(new_agent)
         self._current_agent = None
+        self._response_notify_list = []
+        
+    def _announce_request(self,name):
+        for function in self._response_notify_list:
+            function(name)
+            
+    def add_listener(self,callback):
+        self._response_notify_list.append(callback)
         
     def get_agents(self):
         if len(self._agents) == 0:
@@ -55,10 +63,11 @@ class Game:
     def add_agent(self,agent_token=None,response=None):
         if agent_token:
             headers = {"Authorization":f"Bearer {agent_token}"}
-            new_request = Request("GET","/v2/my/agent",headers=headers,after=self.add_agent)
+            new_request = Request("GET","/v2/my/agent",headers=headers,after=self.add_agent,descriptor="agent")
             self._request_queue.append(new_request)
         if response:
-            response["data"]["token"] = agent_token
+            if agent_token:
+                response["data"]["token"] = agent_token
             new_agent = Agent(self,response["data"])
             command = """
                 SELECT * FROM Agents
@@ -76,6 +85,7 @@ class Game:
     
     def select_agent(self,agent):
         self._current_agent = agent
+        self._current_agent.request_update()
         
     
     def get_current_agent(self):
@@ -108,18 +118,24 @@ class Game:
             return
         if current_request.after == None:
             print(response_data)
-        else:
-            response_json = json.loads(response_data) 
-            current_request.after(response=response_json)
+            return
+        
+        response_json = json.loads(response_data) 
+        current_request.after(response=response_json)
+        descriptor = current_request.descriptor
+        if descriptor and descriptor != "hidden":
+            self._announce_request(descriptor)
+                
         
     
 class Request:
-    def __init__(self,command,link,payload=None,headers=None,after=None):
+    def __init__(self,command,link,payload=None,headers=None,after=None,descriptor=None):
         self.command = command
         self.link = link
         self.payload = payload
         self.headers = headers
         self.after = after
+        self.descriptor = descriptor
 
 class Agent:
     def __init__(self,game,agent_dict=None,agent_tuple=None):
@@ -142,6 +158,23 @@ class Agent:
     def __repr__(self):
         return f"Agent-{self._symbol}"
     
+    def request_update(self,response=None):
+        if response == None:
+            token = self.get_token()
+            if token == None:
+                print("no token")
+                return
+            headers = {"Authorization":f"Bearer {token}"}
+            new_request = Request("GET","/v2/my/agent",headers=headers,after=self.request_update,descriptor="agent")
+            self._game.add_request(new_request)
+        else:
+            data = response["data"]
+            self._symbol = data["symbol"]
+            self._headquarters = data["headquarters"]
+            self._credits = data["credits"]
+            self._starting_faction = data["startingFaction"]
+            self._ship_count = data["shipCount"]
+    
     def get_token(self):
         return self._token
     
@@ -161,17 +194,17 @@ class Agent:
         return self._starting_faction
     
     def get_ship_count(self):
-        return len(self._ships)
+        return self._ship_count
     
         
-    def list_ships(self):
+    def get_ships(self):
         return self._ships
     
     def request_ships(self,response=None):
         if response == None:
-            token = self._current_agent.get_token()
+            token = self.get_token()
             headers = {"Authorization":f"Bearer {token}"}
-            new_request = Request("GET","/v2/my/ships",headers=headers,after=self.request_ships)
+            new_request = Request("GET","/v2/my/ships",headers=headers,after=self.request_ships,descriptor="ships")
             self._game.add_request(new_request)
         else:
             self._ships = []
@@ -180,14 +213,14 @@ class Agent:
                 new_ship = Ship(ship_dict)
                 self._ships.append(new_ship)
                 
-    def list_contracts(self,filter_type=None):
+    def get_contracts(self,filter_type=None):
         return self._contracts
             
     def request_contracts(self,response=None):
         if response == None:
             token = self.get_token()
             headers = {"Authorization":f"Bearer {token}"}
-            new_request = Request("GET","/v2/my/contracts",headers=headers,after=self.request_contracts)
+            new_request = Request("GET","/v2/my/contracts",headers=headers,after=self.request_contracts,descriptor="contracts")
             self._game.add_request(new_request)
         else:
             data = response["data"]
