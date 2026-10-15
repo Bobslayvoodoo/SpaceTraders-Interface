@@ -38,10 +38,13 @@ class AgentScreen:
         self._main_frame.rowconfigure(2,weight=1)
         
         
-        self._ships_frame = ttk.LabelFrame(self._main_frame,text="Ships")
+        
+        self._ships_list = self.ShipsList(self._main_frame,self._current_game)
+        self._update_list.append(self._ships_list)
+        self._ships_frame = self._ships_list.get_main_frame()
         self._ships_frame.grid(column=0,row=0,rowspan=2,sticky="nesw")
         self._ships_frame.columnconfigure(0,weight=1)
-        self._ships_frame.rowconfigure(0,weight=1)
+        self._ships_frame.rowconfigure(9,weight=1)
         
         
         self._contracts_frame = ttk.LabelFrame(self._main_frame,text="Contracts")
@@ -78,9 +81,8 @@ class AgentScreen:
         return self._main_frame
     
     def update(self):
-        agent = self._current_game.get_current_agent()
         for group in self._update_list:
-            group.update(agent)
+            group.update()
         
         
     class AgentDetails():
@@ -106,8 +108,8 @@ class AgentScreen:
         def get_main_frame(self):
             return self._main_frame
             
-        def update(self,agent):
-            
+        def update(self):
+            agent = self._current_game.get_current_agent()
             symbol = agent.get_symbol()
             self._symbol_label.configure(text=symbol)
             
@@ -123,10 +125,64 @@ class AgentScreen:
             ship_count = agent.get_ship_count()
             self._ship_count_label.configure(text=str(ship_count)+ " Ships")
             
+    class ShipsList:
+        def __init__(self,parent,game):
+            self._main_frame = ttk.LabelFrame(parent,text="Ships")
+            self._game = game
+            self._ship_frames = {}
+            
+        class ShipSummary:
+            def __init__(self,parent,ship):
+                self._main_frame = ttk.Frame(parent,borderwidth=1,relief="groove")
+                self._main_frame.columnconfigure(0,weight=1)
+                self._ship = ship
+                self._symbol_label = ttk.Label(self._main_frame,text="symbol")
+                self._symbol_label.grid(column=0,row=0,sticky="nw")
+                
+                self._faction_label = ttk.Label(self._main_frame,text="faction")
+                self._faction_label.grid(column=0,row=1,sticky="nw")
+                
+                self._role_label = ttk.Label(self._main_frame,text="role")
+                self._role_label.grid(column=0,row=2,sticky="nw")
+                
+                self.update()
+            
+            def update(self):
+                symbol = self._ship.get_symbol()
+                self._symbol_label.configure(text=symbol)
+                
+                faction = self._ship.get_faction()
+                self._faction_label.configure(text=faction)
+                
+                role = self._ship.get_role()
+                self._role_label.configure(text=role)
+                
+            def get_main_frame(self):
+                return self._main_frame
+            
+        def update(self):
+            ship_list = self._game.get_current_agent().get_ships()
+            for ship in ship_list:
+                symbol = ship.get_symbol()
+                if symbol in self._ship_frames.keys():
+                    self._ship_frames[symbol].update()
+                else:
+                    new_ship_summary = self.ShipSummary(self._main_frame,ship)
+                    new_frame = new_ship_summary.get_main_frame()
+                    new_frame.grid(column=0,row=len(self._ship_frames),sticky="nwe")
+                    self._ship_frames[symbol] = new_ship_summary
+                    
+                
+            
+            
+        def get_main_frame(self):
+            return self._main_frame
+            
           
           
 def update_call(name):
-    update_dict[name].update()
+    #update_dict[name].update()
+    update_dict["agent"].update()
 
 with open("AccountToken.txt") as account_file:
     account_token = account_file.read().strip()   

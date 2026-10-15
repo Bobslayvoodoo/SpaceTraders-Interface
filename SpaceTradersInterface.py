@@ -154,6 +154,8 @@ class Agent:
             self._credits = None
             self._starting_faction = None
             self._ship_count = None
+            
+        self._ships = []
         
     def __repr__(self):
         return f"Agent-{self._symbol}"
@@ -167,6 +169,8 @@ class Agent:
             headers = {"Authorization":f"Bearer {token}"}
             new_request = Request("GET","/v2/my/agent",headers=headers,after=self.request_update,descriptor="agent")
             self._game.add_request(new_request)
+            self.request_ships()
+            self.request_contracts()
         else:
             data = response["data"]
             self._symbol = data["symbol"]
@@ -489,6 +493,14 @@ class Ship:
             self._total_seconds = cooldown_dict["totalSeconds"]
             self._remaining_seconds = cooldown_dict["remainingSeconds"]
             
+    def get_symbol(self):
+        return self._symbol
+            
+    def get_faction(self):
+        return self._faction_symbol
+    
+    def get_role(self):
+        return self._role
     
 def server_to_datetime(server_time):
     normal_time = datetime.datetime.fromisoformat(server_time)
