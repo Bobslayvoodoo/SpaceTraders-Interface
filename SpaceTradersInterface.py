@@ -2,22 +2,31 @@ import http.client
 import json
 import sqlite3
 import datetime
+import os
 
 DATABASE_NAME = "SpaceTraderDB.db"
 
 class Game:
     def __init__(self,account_token,database_name):
-        self._database = Database(database_name)
-        self._agents = []
-        self._account_token = account_token
-        self._contracts = []
-        self._connection = http.client.HTTPSConnection("api.spacetraders.io")
         self._request_queue = []
+        self._response_notify_list = []
+        self._connection = http.client.HTTPSConnection("api.spacetraders.io")
+        self._account_token = account_token
+        self.request_status()
+        if not self.handle_requests():
+            print("failed to initiate game")
+            return
+
+        self._database = Database(database_name,self._last_reset)
+        self._agents = []
+        
+        self._contracts = []
+        
         for agent in self._database.get_agents():
             new_agent = Agent(self,agent_tuple=agent)
             self._agents.append(new_agent)
         self._current_agent = None
-        self._response_notify_list = []
+        
         
     def _announce_request(self,name):
         for function in self._response_notify_list:
@@ -90,7 +99,23 @@ class Game:
     
     def get_current_agent(self):
         return self._current_agent
-
+    
+    def request_status(self,response=None):
+        if response == None:
+            token = self._account_token
+            if token == None:
+                print("no token")
+                return
+            headers = {"Authorization":f"Bearer {token}"}
+            new_request = Request("GET","/v2/",headers=headers,after=self.request_status,descriptor="status")
+            self.add_request(new_request)
+            return
+        
+        self._status = response["status"]
+        self._api_version = response["version"]
+        self._last_reset = server_to_datetime(response["resetDate"])
+        self._next_reset = server_to_datetime(response["serverResets"]["next"])
+        
     
     def get_waypoints(self):
         pass
@@ -125,6 +150,8 @@ class Game:
         descriptor = current_request.descriptor
         if descriptor and descriptor != "hidden":
             self._announce_request(descriptor)
+            
+        return True # truth as in success
                 
         
     
@@ -253,8 +280,15 @@ class Agent:
                 self._contracts.append(new_contract)
 
 class Database:
-    def __init__(self,database_name):
+    def __init__(self,database_name,last_reset_datetime):
         self._database_name = database_name
+        ## check if stored data is expired ##
+        last_modified_datetime = datetime.datetime.fromtimestamp(os.stat(DATABASE_NAME).st_mtime)
+        if last_modified_datetime < last_reset_datetime:
+            if os.path.exists(database_name):
+                os.remove(database_name)
+                print("reset old database")
+        
         command = """
             CREATE TABLE IF NOT EXISTS Agents (
                Symbol TEXT,
@@ -534,9 +568,7 @@ if __name__ == "__main__":
         account_token = account_file.read().strip()
         
     current_game = Game(account_token,DATABASE_NAME)
-    current_game.select_agent(current_game.get_agents()[-1])
-    print(current_game.get_current_agent().get_token())
-    current_game.handle_requests()
+
 
 
     
