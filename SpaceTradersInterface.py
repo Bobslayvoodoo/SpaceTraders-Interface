@@ -71,9 +71,9 @@ class Game:
             new_agent = Agent(self,response["data"])
             command = """
                 SELECT * FROM Agents
-                WHERE Symbol = ?
+                WHERE Token = ?
                 """
-            if len(list(self._database.execute(command,new_agent.get_symbol()))) < 1:
+            if len(list(self._database.execute(command,new_agent.get_token()))) < 1:
                 command = """
                     INSERT INTO Agents
                     VALUES (?,?)
@@ -155,7 +155,7 @@ class Agent:
             self._starting_faction = None
             self._ship_count = None
             
-        self._ships = []
+        self._ships = {}
         
     def __repr__(self):
         return f"Agent-{self._symbol}"
@@ -200,7 +200,9 @@ class Agent:
     def get_ship_count(self):
         return self._ship_count
     
-        
+    def get_loaded_ship_count(self):
+        return len(self._ships)
+    
     def get_ships(self):
         return self._ships
     
@@ -211,11 +213,14 @@ class Agent:
             new_request = Request("GET","/v2/my/ships",headers=headers,after=self.request_ships,descriptor="ships")
             self._game.add_request(new_request)
         else:
-            self._ships = []
             ships_list = response["data"]
             for ship_dict in ships_list:
-                new_ship = Ship(ship_dict)
-                self._ships.append(new_ship)
+                symbol = ship_dict["symbol"]
+                if symbol in self._ships:
+                    self._ships[symbol].update(ship_dict)
+                else:
+                    new_ship = Ship(ship_dict)
+                    self._ships[symbol] = new_ship
                 
     def get_contracts(self,filter_type=None):
         return self._contracts
@@ -381,28 +386,7 @@ class Ship:
         registration = ship_dict["registration"]
         self._faction_symbol = registration["factionSymbol"]
         self._role = registration["role"]
-        
-        self._navigation = self.Navigation(ship_dict["nav"])
-        self._crew = self.Crew(ship_dict["crew"])
-        self._frame = self.Frame(ship_dict["frame"])
-        self._reactor = self.Reactor(ship_dict["reactor"])
-        self._engine = self.Engine(ship_dict["engine"])
-        self._modules = []
-        for module in ship_dict["modules"]:
-            new_module = self.Module(module)
-            self._modules.append(new_module)
-        
-        self._mounts = []
-        for mount in ship_dict["mounts"]:
-            new_mount = self.Mount(mount)
-            self._mounts.append(new_mount)
-        
-        self._cargo = self.Cargo(ship_dict["cargo"])
-        
-        self._fuel = self.Fuel(ship_dict["fuel"])
-        
-        self._cooldown = self.Cooldown(ship_dict["cooldown"])
-
+        self.update(ship_dict)
 
     class Navigation:
         def __init__(self,nav_dict):
@@ -493,6 +477,36 @@ class Ship:
             self._total_seconds = cooldown_dict["totalSeconds"]
             self._remaining_seconds = cooldown_dict["remainingSeconds"]
             
+    def update(self,ship_dict):
+        self._navigation = self.Navigation(ship_dict["nav"])
+        self._crew = self.Crew(ship_dict["crew"])
+        self._frame = self.Frame(ship_dict["frame"])
+        self._reactor = self.Reactor(ship_dict["reactor"])
+        self._engine = self.Engine(ship_dict["engine"])
+        self._modules = {}
+        for module in ship_dict["modules"]:
+            symbol = module["symbol"]
+            if symbol in self._modules:
+                pass ## modules don't change?
+            else:
+                new_module = self.Module(module)
+                self._modules[symbol] = new_module
+        
+        self._mounts = {}
+        for mount in ship_dict["mounts"]:
+            symbol = mount["symbol"]
+            if symbol in self._mounts:
+                pass ## mounts don't change?
+            else:
+                new_mount = self.Mount(mount)
+                self._mounts[symbol] = new_mount
+        
+        self._cargo = self.Cargo(ship_dict["cargo"])
+        
+        self._fuel = self.Fuel(ship_dict["fuel"])
+        
+        self._cooldown = self.Cooldown(ship_dict["cooldown"])
+            
     def get_symbol(self):
         return self._symbol
             
@@ -520,6 +534,9 @@ if __name__ == "__main__":
         account_token = account_file.read().strip()
         
     current_game = Game(account_token,DATABASE_NAME)
+    current_game.select_agent(current_game.get_agents()[-1])
+    print(current_game.get_current_agent().get_token())
+    current_game.handle_requests()
 
 
     

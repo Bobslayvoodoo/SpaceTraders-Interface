@@ -134,16 +134,24 @@ class AgentScreen:
         class ShipSummary:
             def __init__(self,parent,ship):
                 self._main_frame = ttk.Frame(parent,borderwidth=1,relief="groove")
+                self._main_frame.bind("<Enter>", func=lambda _:self._main_frame.config(borderwidth=5))
+                self._main_frame.bind("<Leave>", func=lambda _:self._main_frame.config(borderwidth=1))
                 self._main_frame.columnconfigure(0,weight=1)
                 self._ship = ship
                 self._symbol_label = ttk.Label(self._main_frame,text="symbol")
                 self._symbol_label.grid(column=0,row=0,sticky="nw")
+                self._symbol_label.bind("<Enter>", func=lambda _:self._main_frame.config(borderwidth=5))
+                self._symbol_label.bind("<Leave>", func=lambda _:self._main_frame.config(borderwidth=1))
                 
                 self._faction_label = ttk.Label(self._main_frame,text="faction")
                 self._faction_label.grid(column=0,row=1,sticky="nw")
+                self._faction_label.bind("<Enter>", func=lambda _:self._main_frame.config(borderwidth=5))
+                self._faction_label.bind("<Leave>", func=lambda _:self._main_frame.config(borderwidth=1))
                 
                 self._role_label = ttk.Label(self._main_frame,text="role")
                 self._role_label.grid(column=0,row=2,sticky="nw")
+                self._role_label.bind("<Enter>", func=lambda _:self._main_frame.config(borderwidth=5))
+                self._role_label.bind("<Leave>", func=lambda _:self._main_frame.config(borderwidth=1))
                 
                 self.update()
             
@@ -162,7 +170,7 @@ class AgentScreen:
             
         def update(self):
             ship_list = self._game.get_current_agent().get_ships()
-            for ship in ship_list:
+            for ship in ship_list.values():
                 symbol = ship.get_symbol()
                 if symbol in self._ship_frames.keys():
                     self._ship_frames[symbol].update()
