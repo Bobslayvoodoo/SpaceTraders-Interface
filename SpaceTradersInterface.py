@@ -246,7 +246,7 @@ class Agent:
                 if symbol in self._ships:
                     self._ships[symbol].update(ship_dict)
                 else:
-                    new_ship = Ship(ship_dict)
+                    new_ship = Ship(self,ship_dict)
                     self._ships[symbol] = new_ship
                 
     def get_contracts(self,filter_type=None):
@@ -415,7 +415,8 @@ class Delivery:
         return (self._required,self._fulfilled)
     
 class Ship:
-    def __init__(self,ship_dict):
+    def __init__(self,owner,ship_dict):
+        self._owner = owner
         self._symbol = ship_dict["symbol"]
         registration = ship_dict["registration"]
         self._faction_symbol = registration["factionSymbol"]
@@ -540,7 +541,539 @@ class Ship:
         self._fuel = self.Fuel(ship_dict["fuel"])
         
         self._cooldown = self.Cooldown(ship_dict["cooldown"])
+        
+    def can_chart(self):
+        return True
+    
+    def chart(self,response=None):
+        if response == None:
+            if not self.can_chart():
+                return
             
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/chart"
+            new_request = Request("POST",url,headers=headers,after=self.chart,descriptor="chart")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+        
+    def can_negotiate_contract(self):
+        # have no ongoing or offered contracts
+        # must be at any waypoint with a faction present
+        return True
+    
+    def negotiate_contract(self,response=None):
+        if response == None:
+            if not self.can_negotiate_contract():
+                return
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/negotiate/contract"
+            new_request = Request("POST",url,headers=headers,after=self.negotiate_contract,descriptor="contract")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_dock(self):
+        return True
+    
+    def dock(self,response=None):
+        if request == None:
+            if not self.can_dock():
+                return
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/dock"
+            new_request = Request("POST",url,headers=headers,after=self.dock,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_extract(self):
+        return True
+    
+    def extract(self,response=None,survey=None):
+        if request == None:
+            if not self.can_extract():
+                return
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            if survey:
+                headers["Content-Type"] = "application/json"
+                payload = json.dumps({})
+                url = "/v2/my/ships/" + self.get_symbol() + "/extract/survey"
+                new_request = Request("POST",url,payload,headers=headers,after=self.extract,descriptor="ship")
+            else:
+                url = "/v2/my/ships/" + self.get_symbol() + "/extract"
+                new_request = Request("POST",url,headers=headers,after=self.extract,descriptor="ship")
+            
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_jettison(self,good_symbol=None,amount=None):
+        # check if got required goods to jettision before wasting request
+        return True
+    
+    def jettison(self,good_symbol=None,amount=None,response=None):
+        if response:
+            if not self.can_jettison(good_symbol,amount):
+                return
+            token = self._owner.get_token()
+            payload = json.dumps({})
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type":"application/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/jettison"
+            new_request = Request("POST",url,payload,headers=headers,after=self.jettison,descriptor="ship")
+            self._game.add_request(new_request)
+        
+        else:
+            pass
+    
+    def can_jump(self,destination=None):
+        # must have 1 antimatter
+        # must be in orbit
+        # must be to connected waypoint
+        return True
+    
+    def jump(self,destination=None,response=None):
+        if request == None:
+            if not self.can_jump(destination):
+                return
+            token = self._owner.get_token()
+            payload = json.dumps({"waypointSymbol":destination})
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type": "applications/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/jump"
+            new_request = Request("POST",url,payload,headers=headers,after=self.jump,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_scan(self):
+        # must have a sensor array
+        return True
+    
+    def scan(self,target=None,response=None):
+        if response == None:
+            if not self.can_scan():
+                return
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            match target:
+                case "systems":
+                    url = "/v2/my/ships/" + self.get_symbol() + "/scan/systems"
+                case "waypoints":
+                    url = "/v2/my/ships/" + self.get_symbol() + "/scan/waypoints"
+                case "ships":
+                    url = "/v2/my/ships/" + self.get_symbol() + "/scan/ships"
+            
+            new_request = Request("POST",url,headers=headers,after=self.scan,descriptor="galaxy")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_scrap(self):
+        # i function therefore I scrap
+        # oh also needs to be at a shipyard
+        return True
+    
+    def scrap(self,response=None):
+        if response == None:
+            if not self.can_scrap():
+                return
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/scrap"
+            new_request = Request("POST",url,headers=headers,after=self.scrap,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def request_scrap_value(self,response=None):
+        if response == None:
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/scrap"
+            new_request = Request("GET",url,headers=headers,after=self.request_scrap_value,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+            
+    def request_ship_cooldown(self,request=None):
+        if request == None:
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/cooldown"
+            new_request = Request("GET",url,headers=headers,after=self.request_ship_cooldown,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_navigate(self,destination=None):
+        # must be in orbit
+        return True
+    
+    def navigate(self,destination=None,response=None):
+        if response == None:
+            if not self.can_navigate():
+                return
+            token = self._owner.get_token()
+            payload = json.dumps({"waypointSymbol":destination})
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type": "applications/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/navigate"
+            new_request = Request("POST",url,payload,headers=headers,after=self.navigate,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_warp(self,destination=None):
+        # must be in orbit
+        # must have warp drive
+        return True
+    
+    def warp(self,destination=None,response=None):
+        if response == None:
+            if not self.can_warp():
+                return
+            token = self._owner.get_token()
+            payload = json.dumps({"waypointSymbol":destination})
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type": "applications/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/warp"
+            new_request = Request("POST",url,payload,headers=headers,after=self.warp,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_orbit(self):
+        return True
+    
+    def orbit(self,response=None):
+        if response == None:
+            if not self.can_orbit():
+                return
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/orbit"
+            new_request = Request("POST",url,headers=headers,after=self.orbit,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_purchase_cargo(self,good_symbol=None,amount=None):
+        ## must be docked at marketplace
+        # market must be selling good_symbol
+        # amount must be <= trade volume and > 0
+        return True
+    
+    def purchase_cargo(self,good_symbol=None,amount=None,response=None):
+        if response == None:
+            if not self.can_purchase_cargo():
+                return
+            token = self._owner.get_token()
+            payload = json.dumps({"symbol":good_symbol})
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type": "applications/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/purchase"
+            new_request = Request("POST",url,payload,headers=headers,after=self.purchase_cargo,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_refine(self,desired_symbol=None):
+        # must have the raw version
+        # have refinery module
+        return True
+    
+    def refine(self,desired_symbol=None,response=None):
+        if response == None:
+            if not self.can_refine(desired_symbol):
+                return
+            token = self._owner.get_token()
+            payload = json.dumps({"produce":desired_symbol})
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type": "applications/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/refine"
+            new_request = Request("POST",url,payload,headers=headers,after=self.refine,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_refuel(self):
+        # must be at a marketplace
+        # market must be selling fuel
+        return True
+    
+    def refuel(self,amount=None,from_cargo=False,response=None):
+        if response == None:
+            if not self.can_refuel():
+                return
+            token = self._owner.get_token()
+            payload = {}
+            if amount:
+                payload["units"] = amount
+            payload["fromCargo"] = from_cargo
+            payload = json.dumps(payload)
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type": "applications/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/refuel"
+            new_request = Request("POST",url,payload,headers=headers,after=self.refuel,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+            
+    def can_repair(self):
+        # must be docked at a shipyard
+        return True
+    
+    def repair(self,response=None):
+        if response == None:
+            if not self.can_repair():
+                return
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/repair"
+            new_request = Request("POST",url,headers=headers,after=self.repair,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+            
+    def get_repair_cost(self,response=None):
+        if response == None:
+            if not self.can_repair():
+                return
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/repair"
+            new_request = Request("GET",url,headers=headers,after=self.get_repair_cost,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_sell_cargo(self,good_symbol=None,amount=None):
+        # must be docked at a marketplace
+        # must have enough to sell
+        return True
+    
+    def sell_cargo(self,good_symbol=None,amount=None,response=None):
+        if response == None:
+            if not self.can_sell_cargo():
+                return
+            token = self._owner.get_token()
+            payload = {}
+            payload["symbol"] = good_symbol
+            payload["units"] = amount
+            payload = json.dumps(payload)
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type": "applications/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/sell"
+            new_request = Request("POST",url,payload,headers=headers,after=self.sell_cargo,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_siphon(self):
+        # must be in orbit of gas giant
+        # must have siphon mounts
+        # must have a gas processor
+        return True
+    
+    def siphon(self,response=None):
+        if response == None:
+            if not self.can_siphon():
+                return
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/siphon"
+            new_request = Request("POST",url,headers=headers,after=self.siphon,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_survey(self):
+        # must have surveyor mount
+        return True
+    
+    def survey(self,response=None):
+        if response == None:
+            if not self.can_survey():
+                return
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/survey"
+            new_request = Request("POST",url,headers=headers,after=self.survey,descriptor="survey")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_transfer(self,good_symbol=None,amount=None,other_ship=None):
+        # we must have enough
+        # other ship must be in the same waypoint and has capacity
+        # both must be in same state (both docked or both orbiting)
+        return True
+    
+    def transfer(self,good_symbol=None,amount=None,other_ship=None,response=None):
+        if response == None:
+            if not self.can_transfer():
+                return
+            token = self._owner.get_token()
+            payload = {}
+            payload["tradeSymbol"] = good_symbol
+            payload["units"] = amount
+            payload["shipSymbol"] = other_ship.get_symbol()
+            payload = json.dumps(payload)
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type": "applications/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/transfer"
+            new_request = Request("POST",url,payload,headers=headers,after=self.transfer,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def request_cargo(self,response=None):
+        if response == None:
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/cargo"
+            new_request = Request("GET",url,headers=headers,after=self.request_cargo,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def request_modules(self,response=None):
+        if response == None:
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/modules"
+            new_request = Request("GET",url,headers=headers,after=self.request_modules,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_install_module(self,module_symbol=None):
+        # module must be in cargo
+        return True
+    
+    def install_module(self,module_symbol=None,response=None):
+        if response == None:
+            if not self.can_install_module(module_symbol):
+                return
+            token = self._owner.get_token()
+            payload = {}
+            payload["symbol"] = module_symbol
+            payload = json.dumps(payload)
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type": "applications/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/modules/install"
+            new_request = Request("POST",url,payload,headers=headers,after=self.install_module,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_remove_module(self,module_symbol=None):
+        # must have given module installed
+        # need room in cargo?
+        return True
+    
+    def remove_module(self,module_symbol=None,response=None):
+        if response == None:
+            if not self.can_remove_module(module_symbol):
+                return
+            token = self._owner.get_token()
+            payload = {}
+            payload["symbol"] = module_symbol
+            payload = json.dumps(payload)
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type": "applications/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/modules/remove"
+            new_request = Request("POST",url,payload,headers=headers,after=self.remove_module,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+            
+    def request_mounts(self,response=None):
+        if response == None:
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/mounts"
+            new_request = Request("GET",url,headers=headers,after=self.request_mounts,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_install_mount(self,mount_symbol=None):
+        # mount must be in cargo
+        # must be docked at a ship yard
+        return True
+    
+    def install_mount(self,mount_symbol=None,response=None):
+        if response == None:
+            if not self.can_install_mount(mount_symbol):
+                return
+            token = self._owner.get_token()
+            payload = {}
+            payload["symbol"] = mount_symbol
+            payload = json.dumps(payload)
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type": "applications/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/mounts/install"
+            new_request = Request("POST",url,payload,headers=headers,after=self.install_mount,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def can_remove_mount(self,mount_symbol=None):
+        # must have given mount installed
+        # must be docked at ship yard
+        # need room in cargo?
+        return True
+    
+    def remove_mount(self,mount_symbol=None,response=None):
+        if response == None:
+            if not self.can_remove_mount(mount_symbol):
+                return
+            token = self._owner.get_token()
+            payload = {}
+            payload["symbol"] = mount_symbol
+            payload = json.dumps(payload)
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type": "applications/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/mounts/remove"
+            new_request = Request("POST",url,payload,headers=headers,after=self.remove_mount,descriptor="ship")
+            self._game.add_request(new_request)
+            
+        else:
+            pass
+        
+    def request_nav(self,response=None):
+        if response == None:
+            token = self._owner.get_token()
+            headers = {"Authorization":f"Bearer {token}"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/nav"
+            new_request = Request("GET",url,headers=headers,after=self.request_nav,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+        
+    def patch_nav(self,flight_mode=None,response=None):
+        if response == None:
+            token = self._owner.get_token()
+            payload = {}
+            payload["flightMode"] = flight_mode
+            payload = json.dumps(payload)
+            headers = {"Authorization":f"Bearer {token}",
+                       "Content-Type": "applications/json"}
+            url = "/v2/my/ships/" + self.get_symbol() + "/nav"
+            new_request = Request("PATCH",url,payload,headers=headers,after=self.patch_nav,descriptor="ship")
+            self._game.add_request(new_request)
+        else:
+            pass
+    
+        
     def get_symbol(self):
         return self._symbol
             
